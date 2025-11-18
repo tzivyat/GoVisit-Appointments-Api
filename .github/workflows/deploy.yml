@@ -1,0 +1,29 @@
+name: Deploy to Google Cloud Run
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - id: 'auth'
+      uses: 'google-github-actions/auth@v1'
+      with:
+        credentials_json: '${{ secrets.GCP_SA_KEY }}'
+    
+    - name: 'Set up Cloud SDK'
+      uses: 'google-github-actions/setup-gcloud@v1'
+    
+    - name: 'Build and Deploy to Cloud Run'
+      run: |
+        gcloud builds submit --tag gcr.io/${{ secrets.GCP_PROJECT_ID }}/govisit-api
+        gcloud run deploy govisit-api \
+          --image gcr.io/${{ secrets.GCP_PROJECT_ID }}/govisit-api \
+          --platform managed \
+          --region us-central1 \
+          --allow-unauthenticated

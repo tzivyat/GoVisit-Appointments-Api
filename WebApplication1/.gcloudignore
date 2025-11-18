@@ -1,0 +1,16 @@
+# Ignore build outputs
+bin/
+obj/
+.vs/
+
+# Ignore git files
+.git/
+.gitignore
+
+# Ignore local settings
+appsettings.Development.json
+*.user
+
+# Ignore documentation
+*.md
+README.md
