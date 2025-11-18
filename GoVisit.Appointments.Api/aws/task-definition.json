@@ -1,0 +1,53 @@
+{
+  "family": "govisit-appointments-api",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+  "executionRoleArn": "arn:aws:iam::{ACCOUNT_ID}:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::{ACCOUNT_ID}:role/ecsTaskRole",
+  "containerDefinitions": [
+    {
+      "name": "govisit-appointments-api",
+      "image": "{ACCOUNT_ID}.dkr.ecr.{REGION}.amazonaws.com/govisit-appointments-api:latest",
+      "portMappings": [
+        {
+          "containerPort": 80,
+          "protocol": "tcp"
+        }
+      ],
+      "essential": true,
+      "environment": [
+        {
+          "name": "ASPNETCORE_ENVIRONMENT",
+          "value": "Production"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "MongoDB__ConnectionString",
+          "valueFrom": "/govisit/mongodb/connection-string"
+        },
+        {
+          "name": "MongoDB__DatabaseName",
+          "valueFrom": "/govisit/mongodb/database-name"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/govisit-appointments-api",
+          "awslogs-region": "{REGION}",
+          "awslogs-stream-prefix": "ecs"
+        }
+      },
+      "healthCheck": {
+        "command": ["CMD-SHELL", "curl -f http://localhost/health || exit 1"],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 60
+      }
+    }
+  ]
+}
