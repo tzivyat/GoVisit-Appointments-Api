@@ -19,35 +19,35 @@ namespace WebApplication1.Repositories
             return appointment;
         }
 
-        public async Task<List<Appointment>> GetByOfficeAsync(string officeId, DateTime? date = null)
-        {
-            var filter = Builders<Appointment>.Filter.Eq(a => a.OfficeId, officeId);
+        //public async Task<List<Appointment>> GetByOfficeAsync(string officeId, DateTime? date = null)
+        //{
+        //    var filter = Builders<Appointment>.Filter.Eq(a => a.OfficeId, officeId);
             
-            if (date.HasValue)
-            {
-                var startOfDay = date.Value.Date;
-                var endOfDay = startOfDay.AddDays(1);
-                filter &= Builders<Appointment>.Filter.Gte(a => a.AppointmentDate, startOfDay) &
-                         Builders<Appointment>.Filter.Lt(a => a.AppointmentDate, endOfDay);
-            }
+        //    if (date.HasValue)
+        //    {
+        //        var startOfDay = date.Value.Date;
+        //        var endOfDay = startOfDay.AddDays(1);
+        //        filter &= Builders<Appointment>.Filter.Gte(a => a.AppointmentDate, startOfDay) &
+        //                 Builders<Appointment>.Filter.Lt(a => a.AppointmentDate, endOfDay);
+        //    }
 
-            return await _appointments.Find(filter)
-                .SortBy(a => a.AppointmentDate)
-                .ToListAsync();
-        }
+        //    return await _appointments.Find(filter)
+        //        .SortBy(a => a.AppointmentDate)
+        //        .ToListAsync();
+        //}
 
         public async Task<Appointment?> GetByIdAsync(string id)
         {
             return await _appointments.Find(a => a.Id == id).FirstOrDefaultAsync();
         }
 
-        public async Task<Appointment?> UpdateAsync(string id, Appointment appointment)
-        {
-            var filter = Builders<Appointment>.Filter.Eq(a => a.Id, id);
-            var result = await _appointments.ReplaceOneAsync(filter, appointment);
+        //public async Task<Appointment?> UpdateAsync(string id, Appointment appointment)
+        //{
+        //    var filter = Builders<Appointment>.Filter.Eq(a => a.Id, id);
+        //    var result = await _appointments.ReplaceOneAsync(filter, appointment);
             
-            return result.ModifiedCount > 0 ? appointment : null;
-        }
+        //    return result.ModifiedCount > 0 ? appointment : null;
+        //}
 
         public async Task<bool> DeleteAsync(string id)
         {
