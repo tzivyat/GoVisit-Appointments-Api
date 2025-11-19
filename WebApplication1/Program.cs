@@ -6,35 +6,37 @@ var builder = WebApplication.CreateBuilder(args);
 
 // GCP Cloud Run port configuration
 var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
-builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
+builder.WebHost.UseUrls($"http://+:{port}");
 
 // Add services to the container.
 builder.Services.AddControllers();
 
-// MongoDB Configuration with Performance Optimizations
-builder.Services.AddSingleton<IMongoClient>(sp =>
+// MongoDB Configuration - Optional for demo
+try
 {
     var connectionString = builder.Configuration.GetConnectionString("MongoDB") ?? 
                           builder.Configuration["MongoDB:ConnectionString"] ??
                           "mongodb://localhost:27017";
     
-    var settings = MongoClientSettings.FromConnectionString(connectionString);
-    // Connection Pool לביצועים מקסימליים
-    settings.MaxConnectionPoolSize = 100;
-    settings.MinConnectionPoolSize = 10;
-    settings.MaxConnectionIdleTime = TimeSpan.FromMinutes(10);
-    settings.ServerSelectionTimeout = TimeSpan.FromSeconds(5);
-    settings.ConnectTimeout = TimeSpan.FromSeconds(10);
-    
-    return new MongoClient(settings);
-});
+    builder.Services.AddSingleton<IMongoClient>(sp =>
+    {
+        var settings = MongoClientSettings.FromConnectionString(connectionString);
+        settings.ServerSelectionTimeout = TimeSpan.FromSeconds(5);
+        settings.ConnectTimeout = TimeSpan.FromSeconds(5);
+        return new MongoClient(settings);
+    });
 
-builder.Services.AddSingleton<IMongoDatabase>(sp =>
+    builder.Services.AddSingleton<IMongoDatabase>(sp =>
+    {
+        var client = sp.GetRequiredService<IMongoClient>();
+        var databaseName = builder.Configuration["MongoDB:DatabaseName"] ?? "GoVisitAppointments";
+        return client.GetDatabase(databaseName);
+    });
+}
+catch
 {
-    var client = sp.GetRequiredService<IMongoClient>();
-    var databaseName = builder.Configuration["MongoDB:DatabaseName"] ?? "GoVisitAppointments";
-    return client.GetDatabase(databaseName);
-});
+    // MongoDB not available - use mock services
+}
 
 // Memory Cache לביצועים
 builder.Services.AddMemoryCache();

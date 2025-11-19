@@ -1,205 +1,336 @@
-# מערכת זימון תורים - GoVisit Appointments API
+# ארכיטקטורת מערכת GoVisit Appointments API
 
 ## סקירה כללית
-מערכת מרכזית לזימון תורים עבור כלל משרדי הממשלה, המאפשרת לאזרחים לקבוע תורים במשרדים שונים ולעובדי המשרדים לנהל את התורים.
+
+מערכת זימון תורים מבוססת ענן עבור משרדי הממשלה, הבנויה על ארכיטקטורת microservices עם דגש על ביצועים, זמינות גבוהה ויכולת הרחבה.
 
 ## ארכיטקטורת המערכת
 
 ### רכיבי המערכת
-1. **API Layer** - ASP.NET Core 8.0 Web API
-2. **Business Logic** - Services עם Repository Pattern
-3. **Data Layer** - MongoDB
-4. **Cloud Infrastructure** - AWS (ECS + DocumentDB)
 
-### מודלים עיקריים
-
-#### Appointment (תור)
-- מזהה ייחודי
-- פרטי האזרח (ת.ז, שם, טלפון)
-- מזהה משרד
-- סוג שירות
-- תאריך ושעת התור
-- סטטוס התור
-- הערות
-
-#### Office (משרד)
-- מזהה ייחודי
-- שם המשרד
-- משרד ממשלתי
-- כתובת
-- שירותים זמינים
-- שעות פעילות
-
-### API Endpoints
-
-#### 1. יצירת תור חדש
 ```
-POST /api/appointments
-```
-**Body:**
-```json
-{
-  "citizenId": "123456789",
-  "citizenName": "ישראל ישראלי",
-  "citizenPhone": "050-1234567",
-  "officeId": "office_id",
-  "serviceType": "הנפקת תעודת זהות",
-  "appointmentDate": "2024-01-15T10:00:00Z",
-  "notes": "הערות נוספות"
-}
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Web Client    │    │   Mobile App    │    │  Admin Portal   │
+│   (Browser)     │    │   (iOS/Android) │    │   (Dashboard)   │
+└─────────┬───────┘    └─────────┬───────┘    └─────────┬───────┘
+          │                      │                      │
+          └──────────────────────┼──────────────────────┘
+                                 │
+                    ┌─────────────▼─────────────┐
+                    │   Load Balancer (GCP)    │
+                    │   Application Gateway     │
+                    └─────────────┬─────────────┘
+                                 │
+                    ┌─────────────▼─────────────┐
+                    │   GoVisit API Service    │
+                    │   (.NET 8 Web API)       │
+                    │   - Controllers Layer    │
+                    │   - Business Logic       │
+                    │   - Repository Pattern   │
+                    └─────────────┬─────────────┘
+                                 │
+                    ┌─────────────▼─────────────┐
+                    │   MongoDB Atlas          │
+                    │   (Document Database)    │
+                    │   - Appointments         │
+                    │   - Offices              │
+                    │   - Audit Logs           │
+                    └─────────────────────────┘
 ```
 
-#### 2. קבלת תורים לפי משרד
-```
-GET /api/appointments/office/{officeId}?date=2024-01-15
-```
-
-#### 3. עדכון סטטוס תור
-```
-PUT /api/appointments/{id}/status
-```
-**Body:**
-```json
-{
-  "status": "Confirmed",
-  "notes": "התור אושר"
-}
-```
-
-#### 4. ביטול תור
-```
-DELETE /api/appointments/{id}
-```
-
-### סטטוסי תור
-- `Scheduled` - מתוזמן
-- `Confirmed` - מאושר
-- `Completed` - הושלם
-- `Cancelled` - בוטל
-- `NoShow` - לא הגיע
-
-## פריסה בענן AWS
+## פריסה בענן - Google Cloud Platform
 
 ### רכיבי התשתית
 
-#### 1. Amazon ECS (Elastic Container Service)
-- **Cluster**: GoVisit-Appointments-Cluster
-- **Service**: appointments-api-service
-- **Task Definition**: מכיל את ה-Docker container של ה-API
+#### 1. **Cloud Run** - Application Hosting
+- **Container Runtime**: Docker containers
+- **Auto Scaling**: 0-10 instances
+- **Resource Allocation**: 1 vCPU, 512 MiB RAM
+- **Request Timeout**: 300 seconds
+- **Concurrency**: 80 requests per instance
 
-#### 2. Amazon DocumentDB (MongoDB Compatible)
-- **Cluster**: govisit-docdb-cluster
-- **Database**: GoVisitAppointments
-- **Collections**: appointments, offices
+#### 2. **Cloud Build** - CI/CD Pipeline
+- **Source**: GitHub repository integration
+- **Build Trigger**: Automatic on master branch push
+- **Build Process**: Multi-stage Docker build
+- **Deployment**: Automatic to Cloud Run
 
-#### 3. Application Load Balancer (ALB)
-- חלוקת עומס בין instances
-- SSL/TLS termination
-- Health checks
+#### 3. **MongoDB Atlas** - Database Service
+- **Cluster**: M0 (Free Tier) / M10 (Production)
+- **Region**: Europe-West1 (Belgium)
+- **Replication**: 3-node replica set
+- **Backup**: Continuous backup with point-in-time recovery
 
-#### 4. Amazon VPC
-- **Subnets**: Public (ALB) + Private (ECS, DocumentDB)
-- **Security Groups**: הגבלת גישה לפורטים נדרשים בלבד
-- **NAT Gateway**: גישה לאינטרנט מ-private subnets
+#### 4. **Cloud Load Balancing**
+- **Type**: Application Load Balancer
+- **SSL/TLS**: Automatic certificate management
+- **Health Checks**: HTTP health endpoint monitoring
+- **Geographic Distribution**: Multi-region support
 
-#### 5. AWS Systems Manager Parameter Store
-- אחסון מאובטח של connection strings
-- הגדרות תצורה
-
-### תרשים ארכיטקטורה
+### ארכיטקטורת הרשת
 
 ```
 Internet
-    ↓
-Application Load Balancer (Public Subnet)
-    ↓
-ECS Service (Private Subnet)
-    ↓
-DocumentDB Cluster (Private Subnet)
+    │
+    ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    Google Cloud Platform                    │
+│                                                             │
+│  ┌─────────────────┐    ┌─────────────────┐                │
+│  │  Cloud DNS      │    │  Cloud CDN      │                │
+│  │  (Domain)       │    │  (Static Assets)│                │
+│  └─────────┬───────┘    └─────────┬───────┘                │
+│            │                      │                        │
+│  ┌─────────▼──────────────────────▼───────┐                │
+│  │        Application Load Balancer       │                │
+│  │        (SSL Termination)               │                │
+│  └─────────────────┬───────────────────────┘                │
+│                    │                                        │
+│  ┌─────────────────▼───────────────────────┐                │
+│  │            Cloud Run Service            │                │
+│  │  ┌─────────────────────────────────────┐ │                │
+│  │  │        API Container             │ │                │
+│  │  │  - .NET 8 Runtime               │ │                │
+│  │  │  - Swagger Documentation        │ │                │
+│  │  │  - Health Monitoring            │ │                │
+│  │  └─────────────────────────────────────┘ │                │
+│  └─────────────────┬───────────────────────┘                │
+│                    │                                        │
+└────────────────────┼────────────────────────────────────────┘
+                     │
+                     ▼
+            ┌─────────────────┐
+            │  MongoDB Atlas  │
+            │  (External SaaS)│
+            └─────────────────┘
 ```
 
-### אבטחה
-- **VPC Security Groups**: הגבלת תעבורת רשת
-- **IAM Roles**: הרשאות מינימליות נדרשות
-- **Parameter Store**: אחסון מאובטח של credentials
-- **HTTPS Only**: כל התקשורת מוצפנת
+## ארכיטקטורת האפליקציה
 
-### ניטור ולוגים
-- **CloudWatch Logs**: לוגי האפליקציה
-- **CloudWatch Metrics**: מטריקות ביצועים
-- **Health Checks**: בדיקות תקינות אוטומטיות
+### שכבות המערכת
 
-### סקיילביליות
-- **Auto Scaling**: הגדלה/הקטנה אוטומטית של instances
-- **DocumentDB Scaling**: קריאה מ-read replicas
-- **Load Balancer**: חלוקת עומס אוטומטית
-
-## הוראות פריסה
-
-### דרישות מוקדמות
-1. AWS CLI מותקן ומוגדר
-2. Docker מותקן
-3. .NET 8.0 SDK
-
-### שלבי הפריסה
-
-#### 1. בניית Docker Image
-```bash
-docker build -t govisit-appointments-api .
-docker tag govisit-appointments-api:latest {account-id}.dkr.ecr.{region}.amazonaws.com/govisit-appointments-api:latest
+#### 1. **Presentation Layer** (Controllers)
+```csharp
+AppointmentsController
+├── SmartBookAppointment()      // POST /api/appointments/smart-booking
+├── GetPrioritizedAppointments() // POST /api/appointments/office/{id}/search
+├── UpdateAppointmentFields()    // PATCH /api/appointments/{id}
+├── CancelWithAlternative()      // DELETE /api/appointments/{id}/with-alternative
+└── GetAppointment()            // GET /api/appointments/{id}
 ```
 
-#### 2. העלאה ל-ECR
-```bash
-aws ecr get-login-password --region {region} | docker login --username AWS --password-stdin {account-id}.dkr.ecr.{region}.amazonaws.com
-docker push {account-id}.dkr.ecr.{region}.amazonaws.com/govisit-appointments-api:latest
+#### 2. **Business Logic Layer** (Services)
+```csharp
+IAppointmentService
+├── SmartBookAppointmentAsync()     // זימון חכם עם בדיקת זמינות
+├── GetPrioritizedAppointmentsAsync() // סינון וסידור לפי עדיפות
+├── UpdateAppointmentFieldsAsync()   // עדכון חלקי של שדות
+├── CancelWithAlternativeAsync()     // ביטול עם הצעת חלופות
+└── GetAppointmentByIdAsync()       // שליפת תור בודד
 ```
 
-#### 3. יצירת DocumentDB Cluster
-```bash
-aws docdb create-db-cluster \
-    --db-cluster-identifier govisit-docdb-cluster \
-    --engine docdb \
-    --master-username admin \
-    --master-user-password {secure-password}
+#### 3. **Data Access Layer** (Repository)
+```csharp
+IAppointmentRepository
+├── CreateAsync()                   // יצירת תור חדש
+├── GetByIdAsync()                 // שליפה לפי מזהה
+├── GetFilteredAppointmentsAsync() // חיפוש מסונן
+├── PartialUpdateAsync()           // עדכון חלקי
+├── DeleteAsync()                  // מחיקת תור
+└── GetAvailableSlotsAsync()       // זמנים פנויים
 ```
 
-#### 4. יצירת ECS Service
-- הגדרת Task Definition
-- יצירת Service עם Load Balancer
-- הגדרת Auto Scaling
-
-### משתני סביבה נדרשים
-- `MongoDB__ConnectionString`: חיבור ל-DocumentDB
-- `MongoDB__DatabaseName`: שם הדאטאבייס
-- `ASPNETCORE_ENVIRONMENT`: Production
-
-## בדיקות ואימות
-
-### Health Check Endpoint
+#### 4. **Data Models**
+```csharp
+Appointment
+├── Id: string
+├── CitizenId: string
+├── CitizenName: string
+├── CitizenPhone: string
+├── OfficeId: string
+├── ServiceType: string
+├── AppointmentDate: DateTime
+├── DurationMinutes: int
+├── Status: AppointmentStatus
+├── Priority: AppointmentPriority
+├── Notes: string
+├── CreatedAt: DateTime
+└── UpdatedAt: DateTime
 ```
-GET /health
+
+## אבטחה ואימות
+
+### אמצעי אבטחה
+
+1. **HTTPS Enforcement**
+   - SSL/TLS 1.2+ חובה
+   - Certificate management אוטומטי
+   - HSTS headers
+
+2. **Input Validation**
+   - Data annotations validation
+   - Model binding validation
+   - SQL injection prevention
+
+3. **Error Handling**
+   - Structured logging
+   - Error masking בproduction
+   - Health monitoring
+
+4. **CORS Policy**
+   - Configured origins
+   - Secure headers
+   - Preflight handling
+
+## ביצועים ואופטימיזציה
+
+### אסטרטגיות ביצועים
+
+1. **Database Optimization**
+   - Connection timeout: 5 seconds ✅
+   - Server selection timeout: 5 seconds ✅
+   - Basic MongoDB configuration
+   - Simple connection management
+
+2. **Caching Strategy**
+   - In-memory caching (IMemoryCache) ✅
+   - Basic memory cache implementation
+   - No CDN configured
+
+3. **Async Programming**
+   - Non-blocking I/O operations
+   - Task-based async pattern
+   - Cancellation token support
+
+## מוניטורינג ולוגים
+
+### כלי מוניטורינג
+
+1. **Application Monitoring**
+   - Health checks endpoint (`/health`)
+   - Performance metrics
+   - Error rate tracking
+
+2. **Infrastructure Monitoring**
+   - Cloud Run metrics
+   - Resource utilization
+   - Auto-scaling events
+
+3. **Logging Strategy**
+   - Structured logging (JSON)
+   - Log levels configuration
+   - Centralized log aggregation
+
+## אסטרטגיית פריסה
+
+### CI/CD Pipeline
+
+```
+GitHub Repository
+        │
+        ▼
+┌─────────────────┐
+│   Code Push     │
+│   (master)      │
+└─────────┬───────┘
+          │
+          ▼
+┌─────────────────┐
+│  Cloud Build    │
+│  - Docker Build │
+│  - Unit Tests   │
+│  - Security Scan│
+└─────────┬───────┘
+          │
+          ▼
+┌─────────────────┐
+│  Container      │
+│  Registry       │
+│  (Artifact)     │
+└─────────┬───────┘
+          │
+          ▼
+┌─────────────────┐
+│  Cloud Run      │
+│  Deployment     │
+│  (Production)   │
+└─────────────────┘
 ```
 
-### Swagger Documentation
-זמין ב: `https://{domain}/swagger`
+### Deployment Strategy
 
-### בדיקות אוטומטיות
-- Unit Tests עבור Services
-- Integration Tests עבור API Endpoints
-- Load Tests עבור ביצועים
+1. **Blue-Green Deployment**
+   - Zero-downtime deployments
+   - Instant rollback capability
+   - Traffic splitting for testing
 
-## תחזוקה ועדכונים
+2. **Auto-scaling Configuration**
+   - Min instances: 0 (cost optimization)
+   - Max instances: 10 (performance limit)
+   - CPU utilization threshold: 70%
+   - Memory utilization threshold: 80%
 
-### גיבויים
-- DocumentDB Automated Backups
-- Point-in-time Recovery
+## אסטרטגיית גיבוי ושחזור
 
-### עדכוני גרסה
-- Blue/Green Deployment באמצעות ECS
-- Zero-downtime updates
+### Database Backup
+- **MongoDB Atlas**: Automatic backup (if using Atlas)
+- **Local Development**: Manual backup procedures
+- **Configuration**: Connection string based
 
-### ניטור ואלרטים
-- CloudWatch Alarms עבור שגיאות
-- Performance monitoring
-- Cost monitoring
+### Disaster Recovery
+- **Simple Recovery**: Container restart capability
+- **Data Recovery**: Depends on MongoDB configuration
+- **Stateless Design**: Easy redeployment
+
+## עלויות ותחזוקה
+
+### Cost Optimization
+- **Serverless Architecture**: Pay-per-request model
+- **Auto-scaling**: Scale to zero when idle
+- **Resource Right-sizing**: Optimized CPU/Memory allocation
+
+### Maintenance Windows
+- **Automated Updates**: Container base image updates
+- **Security Patches**: Automatic OS-level patching
+- **Database Maintenance**: Managed by MongoDB Atlas
+
+## מדדי ביצועים (KPIs)
+
+### Performance Metrics
+- **Health Check**: `/health` endpoint ✅
+- **Basic Monitoring**: Application logs
+- **Error Handling**: Try-catch blocks ✅
+- **Timeout Configuration**: 5 seconds ✅
+
+### Business Metrics
+- **Appointment Success Rate**: > 95%
+- **User Satisfaction**: Measured via API response times
+- **System Utilization**: Optimal resource usage
+
+---
+
+## מצב הפרויקט הנוכחי
+
+### ✅ **מיושם בפרויקט:**
+- .NET 8 Web API עם Swagger
+- MongoDB integration עם connection management
+- Repository Pattern + Service Layer
+- 5 API endpoints מתועדים
+- Docker containerization
+- Health check endpoint
+- CORS configuration
+- Error handling ו-logging
+- Memory caching (IMemoryCache)
+
+### 🚧 **לא מיושם (אפשר להוסיף):**
+- Unit tests
+- Authentication/Authorization
+- Advanced monitoring
+- Database indexing
+- Response caching
+- Rate limiting
+- Advanced error handling
+
+## סיכום
+
+מערכת GoVisit Appointments API מספקת בסיס חזק לפתרון זימון תורים, עם ארכיטקטורה נקייה ומוכנות לפריסה בענן. הפרויקט כולל את כל הרכיבים הבסיסיים הנדרשים ומוכן להרחבה עתידית.

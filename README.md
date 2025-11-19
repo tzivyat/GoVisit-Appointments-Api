@@ -13,9 +13,9 @@
 ## טכנולוגיות
 
 - **.NET 8.0** - Web API Framework
-- **MongoDB** - מסד נתונים NoSQL
-- **AWS ECS** - Container orchestration
-- **AWS DocumentDB** - MongoDB compatible database
+- **MongoDB Atlas** - מסד נתונים NoSQL בענן
+- **Google Cloud Run** - Container orchestration
+- **Docker** - Containerization
 - **Swagger/OpenAPI** - תיעוד API
 
 ## התקנה מקומית
@@ -49,35 +49,45 @@ dotnet run
 
 5. **גישה ל-Swagger UI:**
 ```
-https://localhost:7000
+http://localhost:8080/swagger
 ```
 
 ## API Endpoints
 
-### יצירת תור חדש
+### זימון תור חכם
 ```http
-POST /api/appointments
+POST /api/appointments/smart-booking
 Content-Type: application/json
 
 {
   "citizenId": "123456789",
-  "citizenName": "ישראל ישראלי", 
+  "citizenName": "ישראל ישראלי",
   "citizenPhone": "050-1234567",
   "officeId": "office123",
   "serviceType": "הנפקת תעודת זהות",
-  "appointmentDate": "2024-01-15T10:00:00Z",
+  "preferredDate": "2024-01-15",
+  "preferredTime": "10:00:00",
+  "durationMinutes": 30,
   "notes": "הערות"
 }
 ```
 
-### קבלת תורים לפי משרד
+### חיפוש תורים מתקדם
 ```http
-GET /api/appointments/office/{officeId}?date=2024-01-15
+POST /api/appointments/office/{officeId}/search
+Content-Type: application/json
+
+{
+  "activeOnly": true,
+  "status": "Confirmed",
+  "fromDate": "2024-01-01",
+  "toDate": "2024-01-31"
+}
 ```
 
-### עדכון סטטוס תור
+### עדכון תור
 ```http
-PUT /api/appointments/{id}/status
+PATCH /api/appointments/{id}
 Content-Type: application/json
 
 {
@@ -86,31 +96,42 @@ Content-Type: application/json
 }
 ```
 
-### ביטול תור
+### ביטול תור עם חלופות
 ```http
-DELETE /api/appointments/{id}
+DELETE /api/appointments/{id}/with-alternative
+```
+
+### קבלת תור
+```http
+GET /api/appointments/{id}
 ```
 
 ## פריסה בענן
 
-הפרויקט מוכן לפריסה ב-AWS באמצעות:
-- **ECS (Elastic Container Service)** - להרצת containers
-- **DocumentDB** - מסד נתונים מנוהל
-- **Application Load Balancer** - חלוקת עומס
+הפרויקט מוכן לפריסה ב-Google Cloud Platform:
+- **Cloud Run** - Serverless container platform
+- **Cloud Build** - CI/CD pipeline
+- **MongoDB Atlas** - מסד נתונים מנוהל
+- **GitHub Integration** - פריסה אוטומטית
 
-לפרטים מלאים ראה: [ARCHITECTURE.md](ARCHITECTURE.md)
+לפרטים מלאים ראה: [SYSTEM_ARCHITECTURE.md](SYSTEM_ARCHITECTURE.md)
 
 ## מבנה הפרויקט
 
 ```
 WebApplication1/
-├── Controllers/          # API Controllers
+├── Controllers/          # API Controllers (5 endpoints)
+├── Services/            # Business Logic Layer
+├── Repositories/        # Data Access Layer
 ├── Models/              # Data Models
-├── DTOs/                # Data Transfer Objects  
-├── Services/            # Business Logic
+├── DTOs/                # Data Transfer Objects
+├── Resources/           # Messages & Constants
+├── Properties/          # Launch Settings
 ├── Program.cs           # Application Entry Point
 ├── Dockerfile           # Container Configuration
-└── appsettings.json     # Configuration
+├── appsettings.json     # Base Configuration
+├── appsettings.Development.json  # Dev Settings
+└── appsettings.Production.json   # Prod Settings
 ```
 
 ## הגדרות תצורה
@@ -119,7 +140,7 @@ WebApplication1/
 ```json
 {
   "MongoDB": {
-    "ConnectionString": "mongodb://localhost:27017",
+    "ConnectionString": "mongodb+srv://govisit-user:SecurePass123@govisitdb.301iada.mongodb.net/?appName=GoVisitDB",
     "DatabaseName": "GoVisitAppointments"
   }
 }
@@ -131,14 +152,18 @@ WebApplication1/
 
 ## בדיקות
 
-### הרצת בדיקות יחידה
-```bash
-dotnet test
-```
-
 ### בדיקת Health Check
 ```http
 GET /health
+Response: {
+  "status": "healthy",
+  "timestamp": "2024-01-15T10:00:00Z"
+}
+```
+
+### בדיקת Swagger Documentation
+```
+http://localhost:8080/swagger
 ```
 
 ## תרומה לפרויקט
