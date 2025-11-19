@@ -3,6 +3,7 @@ using WebApplication1.Services;
 using WebApplication1.DTOs;
 using WebApplication1.Models;
 using WebApplication1.Resources;
+using System.ComponentModel.DataAnnotations;
 
 namespace WebApplication1.Controllers
 {
@@ -50,7 +51,7 @@ namespace WebApplication1.Controllers
         /// </summary>
         [HttpPost("office/{officeId}/search")]
         public async Task<ActionResult<List<Appointment>>> GetPrioritizedAppointments(
-            string officeId,
+            [Required] string officeId,
             [FromBody] AppointmentFilterDto filter)
         {
             try

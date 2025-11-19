@@ -10,7 +10,6 @@ namespace WebApplication1.Repositories
         Task<Appointment?> GetByIdAsync(string id);
         Task<Appointment?> UpdateAsync(string id, Appointment appointment);
         Task<bool> DeleteAsync(string id);
-        Task<bool> IsSlotAvailableAsync(string officeId, DateTime dateTime, int durationMinutes);
         Task<List<DateTime>> GetAvailableSlotsAsync(string officeId, DateTime date, int durationMinutes);
         Task<List<Appointment>> GetFilteredAppointmentsAsync(string officeId, AppointmentFilterDto filter);
         Task<Appointment?> PartialUpdateAsync(string id, UpdateAppointmentDto dto);

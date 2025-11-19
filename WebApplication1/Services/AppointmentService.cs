@@ -2,6 +2,7 @@ using WebApplication1.Models;
 using WebApplication1.DTOs;
 using WebApplication1.Repositories;
 using WebApplication1.Resources;
+using MongoDB.Driver;
 
 namespace WebApplication1.Services
 {
@@ -23,25 +24,24 @@ namespace WebApplication1.Services
         {
             var requestedDateTime = request.PreferredDate.Date.Add(request.PreferredTime);
             
-            var isAvailable = await _repository.IsSlotAvailableAsync(
-                request.OfficeId, requestedDateTime, request.DurationMinutes);
-
-            if (isAvailable)
+            // גישה אופטימיסטית - ננסה ליצור ישירות
+            var appointment = new Appointment
             {
-                var appointment = new Appointment
-                {
-                    CitizenId = request.CitizenId,
-                    CitizenName = request.CitizenName,
-                    CitizenPhone = request.CitizenPhone,
-                    OfficeId = request.OfficeId,
-                    ServiceType = request.ServiceType,
-                    AppointmentDate = requestedDateTime,
-                    DurationMinutes = request.DurationMinutes,
-                    Notes = request.Notes,
-                    Status = AppointmentStatus.Confirmed,
-                    CreatedAt = DateTime.UtcNow
-                };
+                CitizenId = request.CitizenId,
+                CitizenName = request.CitizenName,
+                CitizenPhone = request.CitizenPhone,
+                OfficeId = request.OfficeId,
+                ServiceType = request.ServiceType,
+                AppointmentDate = requestedDateTime,
+                DurationMinutes = request.DurationMinutes,
+                Notes = request.Notes,
+                Status = AppointmentStatus.Confirmed,
+                CreatedAt = DateTime.UtcNow
+            };
 
+            try
+            {
+                // MongoDB יטפל בהתנגשויות דרך unique index
                 var createdAppointment = await _repository.CreateAsync(appointment);
                 
                 return new SmartBookingResponseDto
@@ -51,16 +51,19 @@ namespace WebApplication1.Services
                     Message = Messages.AppointmentCreatedSuccessfully
                 };
             }
-
-            var alternatives = await FindAlternativeSlotsAsync(
-                request.OfficeId, requestedDateTime, request.DurationMinutes);
-
-            return new SmartBookingResponseDto
+            catch (MongoWriteException ex) when (ex.WriteError?.Code == 11000)
             {
-                Success = false,
-                Alternatives = alternatives,
-                Message = Messages.SlotNotAvailable
-            };
+                // התנגשות - הslot כבר תפוס
+                var alternatives = await FindAlternativeSlotsAsync(
+                    request.OfficeId, requestedDateTime, request.DurationMinutes);
+
+                return new SmartBookingResponseDto
+                {
+                    Success = false,
+                    Alternatives = alternatives,
+                    Message = Messages.SlotNotAvailable
+                };
+            }
         }
 
         public async Task<List<Appointment>> GetPrioritizedAppointmentsAsync(string officeId, AppointmentFilterDto filter)
@@ -85,8 +88,8 @@ namespace WebApplication1.Services
                 };
             }
 
-            appointment.Status = AppointmentStatus.Cancelled;
-            await _repository.UpdateAsync(id, appointment);
+            // Soft delete - מחיקה פיזית לשחרור את הslot
+            await _repository.DeleteAsync(id);
 
             var weekStart = appointment.AppointmentDate.Date.AddDays(-(int)appointment.AppointmentDate.DayOfWeek);
             var weekEnd = weekStart.AddDays(7);
